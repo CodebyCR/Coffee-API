@@ -56,11 +56,14 @@ fileprivate func testMenu(_ app: Application) {
 
     // GET /test/orders
     menu.get { req in
+        print("[GET]/test/orders")
         // In einer realen Anwendung würden Sie hier die Daten aus der Datenbank abrufen
         return [
-            Coffee(id: UUID(), productNumber: 1, name: "Cappuccino"),
-            Coffee(id: UUID(), productNumber: 2, name: "Latte Macchiato"),
-            Coffee(id: UUID(), productNumber: 3, name: "Espresso")
+            Coffee(id: UUID(), productNumber: 1, name: "Cappuccino", price: 3.5),
+            Coffee(id: UUID(), productNumber: 2, name: "Latte Macchiato", price: 4.8),
+            Coffee(id: UUID(), productNumber: 3, name: "Espresso", price: 1.9),
+            Coffee(id: UUID(), productNumber: 4, name: "Americano", price: 2.2),
+            Coffee(id: UUID(), productNumber: 5, name: "Ice Caffee", price: 3.8)
         ]
     }
 

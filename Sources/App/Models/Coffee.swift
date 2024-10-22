@@ -11,6 +11,5 @@ struct Coffee: Content, Identifiable {
     let id: UUID
     let productNumber: UInt16
     let name: String
-
-
+    let price: Float64
 }
