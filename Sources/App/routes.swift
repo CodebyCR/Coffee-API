@@ -63,7 +63,8 @@ fileprivate func testMenu(_ app: Application) {
             Coffee(id: UUID(), productNumber: 2, name: "Latte Macchiato", price: 4.8),
             Coffee(id: UUID(), productNumber: 3, name: "Espresso", price: 1.9),
             Coffee(id: UUID(), productNumber: 4, name: "Americano", price: 2.2),
-            Coffee(id: UUID(), productNumber: 5, name: "Ice Caffee", price: 3.8)
+            Coffee(id: UUID(), productNumber: 5, name: "Ice Caffee", price: 3.8),
+            Coffee(id: UUID(), productNumber: 6, name: "Caffee Crema", price: 1.8)
         ]
     }
 
