@@ -1,6 +1,6 @@
 import Fluent
-import Vapor
 import FluentSQLiteDriver
+import Vapor
 
 // Konfiguriere die Anwendung
 func configure(_ app: Application) throws {
@@ -12,25 +12,25 @@ func configure(_ app: Application) throws {
 }
 
 // Definiere die Routen
-fileprivate func testOrders(_ app: Application) {
+private func testOrders(_ app: Application) {
     let orders = app.grouped("test", "orders")
-    
+
     // GET /test/orders
-    orders.get { req in
+    orders.get { _ in
         // In einer realen Anwendung würden Sie hier die Daten aus der Datenbank abrufen
-        return [
+        [
             Order(id: UUID(), name: "John Doe", coffeeName: "Hot Coffee", total: 4.50, size: "Medium"),
             Order(id: UUID(), name: "Jane Smith", coffeeName: "Latte", total: 5.00, size: "Large")
         ]
     }
-    
+
     // POST /test/orders
     orders.post { req -> Order in
         let order = try req.content.decode(Order.self)
         // In einer realen Anwendung würden Sie hier die Order in der Datenbank speichern
         return order
     }
-    
+
     // DELETE /test/orders/:id
     orders.delete(":id") { req -> HTTPStatus in
         guard let id = req.parameters.get("id", as: UUID.self) else {
@@ -39,7 +39,7 @@ fileprivate func testOrders(_ app: Application) {
         // In einer realen Anwendung würden Sie hier die Order mit der gegebenen ID aus der Datenbank löschen
         return .ok
     }
-    
+
     // PUT /test/orders/:id
     orders.put(":id") { req -> Order in
         guard let id = req.parameters.get("id", as: UUID.self) else {
@@ -51,11 +51,11 @@ fileprivate func testOrders(_ app: Application) {
     }
 }
 
-fileprivate func testMenu(_ app: Application) {
+private func testMenu(_ app: Application) {
     let menu = app.grouped("test", "menu")
 
     // GET /test/orders
-    menu.get { req in
+    menu.get { _ in
         print("[GET]/test/orders")
         // In einer realen Anwendung würden Sie hier die Daten aus der Datenbank abrufen
         return [
@@ -69,6 +69,18 @@ fileprivate func testMenu(_ app: Application) {
     }
 
 
+    // incoming get request /test/menu/id={1}
+    // GET /test/menu/id/123
+    menu.get("id", ":id") { req -> Coffee in
+        print("[GET]/test/menu/id")
+        guard let id = req.parameters.get("id") else {
+            throw Abort(.badRequest)
+        }
+        print("[GET]/test/menu/id/\(id)")
+
+        // In einer realen Anwendung würden Sie hier die Daten aus der Datenbank abrufen
+        return Coffee(id: UUID(), productNumber: 1, name: "Cappuccino", price: 3.5)
+    }
 }
 
 func routes(_ app: Application) throws {
