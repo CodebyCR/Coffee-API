@@ -1,5 +1,8 @@
+
 import Fluent
+import FluentSQL
 import FluentSQLiteDriver
+import SQLiteNIO
 import Vapor
 
 // Konfiguriere die Anwendung
@@ -68,7 +71,6 @@ private func testMenu(_ app: Application) {
         ]
     }
 
-
     // incoming get request /test/menu/id={1}
     // GET /test/menu/id/123
     menu.get("id", ":id") { req -> Coffee in
@@ -80,6 +82,34 @@ private func testMenu(_ app: Application) {
 
         // In einer realen Anwendung würden Sie hier die Daten aus der Datenbank abrufen
         return Coffee(id: UUID(), productNumber: 1, name: "Cappuccino", price: 3.5)
+    }
+
+    menu.get("txt") { req -> String in
+        print("[GET]/test/menu/txt")
+        // raw query from sqlite
+        guard let db = req.db as? SQLDatabase else {
+            print("Database unavailable")
+            return "Database unavailable"
+        }
+
+        // The underlying database driver is SQL.
+        let rawBuilder = db.raw("""
+            SELECT json_array(
+                json_object(
+                    'index_ids', json_group_array(printf('%d', index_id))
+                )
+            ) as index_ids
+            FROM drink;
+        """)
+
+        let rows = try await rawBuilder.all()
+
+        // requiered result as json string:
+        // [{"index_id":"1"},{"index_id":"2"},{"index_id":"3"},{"index_id":"4"},{"index_id":"5"},{"index_id":"6"}]
+
+        let optionalJson = try rows.first?.decode(column: "index_ids", as: String.self)
+
+        return optionalJson ?? #"[{"index_ids": []}]"#
     }
 }
 
