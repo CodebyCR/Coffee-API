@@ -4,11 +4,12 @@ import PackageDescription
 let package = Package(
     name: "CoffeeAPI",
     platforms: [
-       .macOS(.v13)
+        .macOS(.v13),
     ],
     dependencies: [
         // 💧 A server-side Swift web framework.
         .package(url: "https://github.com/vapor/vapor.git", from: "4.99.3"),
+
         // 🗄 An ORM for SQL and NoSQL databases.
         .package(url: "https://github.com/vapor/fluent.git", from: "4.9.0"),
         // 🪶 Fluent driver for SQLite.
@@ -35,7 +36,7 @@ let package = Package(
                 .product(name: "XCTVapor", package: "vapor"),
             ],
             swiftSettings: swiftSettings
-        )
+        ),
     ],
     swiftLanguageModes: [.v5]
 )
