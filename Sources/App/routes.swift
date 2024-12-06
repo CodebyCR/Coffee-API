@@ -35,17 +35,17 @@ private func testOrders(_ app: Application) {
     }
 
     // DELETE /test/orders/:id
-    orders.delete(":id") { req -> HTTPStatus in
-        guard let id = req.parameters.get("id", as: UUID.self) else {
-            throw Abort(.badRequest)
-        }
-        // In einer realen Anwendung würden Sie hier die Order mit der gegebenen ID aus der Datenbank löschen
-        return .ok
-    }
+//    orders.delete(":id") { req -> HTTPStatus in
+//        guard let id = req.parameters.get("id", as: UUID.self) else {
+//            throw Abort(.badRequest)
+//        }
+//        // In einer realen Anwendung würden Sie hier die Order mit der gegebenen ID aus der Datenbank löschen
+//        return .ok
+//    }
 
     // PUT /test/orders/:id
     orders.put(":id") { req -> Order in
-        guard let id = req.parameters.get("id", as: UUID.self) else {
+        guard req.parameters.get("id", as: UUID.self) != nil else {
             throw Abort(.badRequest)
         }
         let updatedOrder = try req.content.decode(Order.self)
@@ -58,33 +58,67 @@ private func testMenu(_ app: Application) {
     let menu = app.grouped("test", "menu")
 
     // GET /test/orders
-    menu.get { _ in
+    menu.get { req in
         print("[GET]/test/orders")
         // In einer realen Anwendung würden Sie hier die Daten aus der Datenbank abrufen
-        return [
-            Coffee(id: UUID(), productNumber: 1, name: "Cappuccino", price: 3.5),
-            Coffee(id: UUID(), productNumber: 2, name: "Latte Macchiato", price: 4.8),
-            Coffee(id: UUID(), productNumber: 3, name: "Espresso", price: 1.9),
-            Coffee(id: UUID(), productNumber: 4, name: "Americano", price: 2.2),
-            Coffee(id: UUID(), productNumber: 5, name: "Ice Caffee", price: 3.8),
-            Coffee(id: UUID(), productNumber: 6, name: "Caffee Crema", price: 1.8)
-        ]
+
+        guard let db = req.db as? SQLDatabase else {
+            print("Database unavailable")
+            throw Abort(.internalServerError)
+        }
+
+        let rows = try await db.raw("""
+        SELECT json_group_array(
+          json_object(
+            'id', index_id, 
+            'name', name, 
+            'price', price, 
+            'date', creation_date
+          )
+        ) AS drink_list
+        FROM drink;
+        """).all()
+
+        for row in rows {
+            return try row.decode(column: "drink_list", as: String.self)
+        }
+
+        throw Abort(.notFound)
     }
 
     // incoming get request /test/menu/id={1}
     // GET /test/menu/id/123
-    menu.get("id", ":id") { req -> Coffee in
+    menu.get("id", ":id") { req in
         print("[GET]/test/menu/id")
         guard let id = req.parameters.get("id") else {
             throw Abort(.badRequest)
         }
         print("[GET]/test/menu/id/\(id)")
 
-        // In einer realen Anwendung würden Sie hier die Daten aus der Datenbank abrufen
-        return Coffee(id: UUID(), productNumber: 1, name: "Cappuccino", price: 3.5)
+        guard let db = req.db as? SQLDatabase else {
+            print("Database unavailable")
+            throw Abort(.internalServerError)
+        }
+
+        let rows = try await db.raw("""
+        SELECT json_object(
+          'id', index_id, 
+          'name', name, 
+          'price', price, 
+          'date', creation_date
+        ) AS drink_json
+        FROM drink
+        WHERE index_id = \(unsafeRaw: id);
+        """).all()
+
+        for row in rows {
+            return try row.decode(column: "drink_json", as: String.self)
+        }
+
+        throw Abort(.notFound)
     }
 
-    menu.get("txt") { req -> String in
+    menu.get("index_ids") { req -> String in
         print("[GET]/test/menu/txt")
         // raw query from sqlite
         guard let db = req.db as? SQLDatabase else {
@@ -94,12 +128,9 @@ private func testMenu(_ app: Application) {
 
         // The underlying database driver is SQL.
         let rawBuilder = db.raw("""
-            SELECT json_array(
-                json_object(
-                    'index_ids', json_group_array(printf('%d', index_id))
-                )
-            ) as index_ids
-            FROM drink;
+        SELECT
+            json_group_array(printf('%d', index_id)) as index_ids
+        FROM drink;
         """)
 
         let rows = try await rawBuilder.all()
@@ -109,7 +140,7 @@ private func testMenu(_ app: Application) {
 
         let optionalJson = try rows.first?.decode(column: "index_ids", as: String.self)
 
-        return optionalJson ?? #"[{"index_ids": []}]"#
+        return optionalJson ?? "[]"
     }
 }
 
