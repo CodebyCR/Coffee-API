@@ -8,8 +8,8 @@ import Foundation
 import Vapor
 
 struct Coffee: Content, Identifiable {
-    let id: UUID
-    let productNumber: UInt16
+    var id: UInt16
     let name: String
     let price: Float64
+    let date: Date
 }
