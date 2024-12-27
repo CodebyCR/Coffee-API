@@ -93,7 +93,7 @@ private func testMenu(_ app: Application) {
         guard let id = req.parameters.get("id") else {
             throw Abort(.badRequest)
         }
-        print("[GET]/test/menu/id/\(id)")
+        print("[GET]http://127.0.0.1:8080/test/menu/id/\(id)")
 
         guard let db = req.db as? SQLDatabase else {
             print("Database unavailable")
@@ -101,14 +101,24 @@ private func testMenu(_ app: Application) {
         }
 
         let rows = try await db.raw("""
-        SELECT json_object(
-          'id', index_id, 
-          'name', name, 
-          'price', price, 
-          'date', creation_date
-        ) AS drink_json
-        FROM drink
-        WHERE index_id = \(unsafeRaw: id);
+            SELECT 
+            json_object(
+                'id', d.id,
+                'name', d.name,
+                'price', d.price,
+                'metadata', json_object(
+                'created_at', d.created_at,
+                'updated_at', d.updated_at,
+                'tag_ids',
+                    CASE 
+                        WHEN COUNT(dtr.tag_id) = 1 AND dtr.tag_id IS NULL THEN '[]'
+                        ELSE json_group_array(dtr.tag_id)
+                    END
+                )
+            ) as drink_json
+            FROM drinks d
+            LEFT JOIN drinks_tags_relation dtr ON d.id = dtr.drink_id
+            WHERE d.id = \(unsafeRaw: id);
         """).all()
 
         for row in rows {
@@ -118,8 +128,8 @@ private func testMenu(_ app: Application) {
         throw Abort(.notFound)
     }
 
-    menu.get("index_ids") { req -> String in
-        print("[GET]/test/menu/txt")
+    menu.get("ids") { req -> String in
+        print("[GET]http://127.0.0.1:8080/test/menu/txt")
         // raw query from sqlite
         guard let db = req.db as? SQLDatabase else {
             print("Database unavailable")
@@ -128,9 +138,9 @@ private func testMenu(_ app: Application) {
 
         // The underlying database driver is SQL.
         let rawBuilder = db.raw("""
-        SELECT
-            json_group_array(printf('%d', index_id)) as index_ids
-        FROM drink;
+            SELECT
+                json_group_array(printf('%d', id)) as ids
+            FROM drinks;
         """)
 
         let rows = try await rawBuilder.all()
@@ -138,7 +148,7 @@ private func testMenu(_ app: Application) {
         // requiered result as json string:
         // [{"index_id":"1"},{"index_id":"2"},{"index_id":"3"},{"index_id":"4"},{"index_id":"5"},{"index_id":"6"}]
 
-        let optionalJson = try rows.first?.decode(column: "index_ids", as: String.self)
+        let optionalJson = try rows.first?.decode(column: "ids", as: String.self)
 
         return optionalJson ?? "[]"
     }
