@@ -152,10 +152,48 @@ private func testMenu(_ app: Application) {
 
         return optionalJson ?? "[]"
     }
+
 }
 
+    
+    private func testOrder(_ app: Application) {
+        let newOrder = app.grouped("test", "order")
+
+        /// POST to http://127.0.0.1:8080/test/order/id=12323
+        
+        newOrder.post("id", ":id") { req -> String in
+
+            guard let id = req.parameters.get("id") else {
+                throw Abort(.badRequest)
+            }
+            print("[POST]http://127.0.0.1:8080/test/order/id=\(id)")
+
+//            guard let db = req.db as? SQLDatabase else {
+//                print("Database unavailable")
+//                return "Database unavailable"
+//            }
+//
+//            let postData = try req.content.decode(Order.self)
+//
+//
+//            let rawBuilder = db.raw("""
+//                INSERT INTO orders (name, coffee_name, total, size)
+//                VALUES ('\(postData.name)', '\(postData.coffeeName)', \(bind: postData.total), '\(postData.size)');
+//            """)
+            return ""
+
+    }
+
+
+}
+
+
+
 func routes(_ app: Application) throws {
-    testOrders(app)
+    
+    
+    testOrder(app)
 
     testMenu(app)
 }
+

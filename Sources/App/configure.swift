@@ -5,7 +5,7 @@ import Vapor
 
 // configures your application
 public func configure(_ app: Application) async throws {
-    let databasePath = app.directory.workingDirectory + "Databases/CoffeeLover.sqlite"
+    let databasePath = app.directory.workingDirectory + "CoffeeAPI/Databases/CoffeeLover.sqlite"
     print("Database path: \(databasePath)")
     let databaseFactory = DatabaseConfigurationFactory.sqlite(.file(databasePath))
     app.databases.use(databaseFactory, as: .sqlite)
