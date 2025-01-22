@@ -55,7 +55,7 @@ private func testOrders(_ app: Application) {
 }
 
 private func testMenu(_ app: Application) {
-    let menu = app.grouped("test", "menu")
+    let menu = app.grouped("test", "coffee")
 
     // GET /test/orders
     menu.get { req in
@@ -89,11 +89,11 @@ private func testMenu(_ app: Application) {
     // incoming get request /test/menu/id={1}
     // GET /test/menu/id/123
     menu.get("id", ":id") { req in
-        print("[GET]/test/menu/id")
+
         guard let id = req.parameters.get("id") else {
             throw Abort(.badRequest)
         }
-        print("[GET]http://127.0.0.1:8080/test/menu/id/\(id)")
+        print("[GET] http://127.0.0.1:8080/test/coffee/id/\(id)")
 
         guard let db = req.db as? SQLDatabase else {
             print("Database unavailable")
@@ -129,7 +129,7 @@ private func testMenu(_ app: Application) {
     }
 
     menu.get("ids") { req -> String in
-        print("[GET]http://127.0.0.1:8080/test/menu/txt")
+        print("[GET] http://127.0.0.1:8080/test/coffee/ids")
         // raw query from sqlite
         guard let db = req.db as? SQLDatabase else {
             print("Database unavailable")
@@ -155,12 +155,12 @@ private func testMenu(_ app: Application) {
 
 }
 
-    
+
     private func testOrder(_ app: Application) {
         let newOrder = app.grouped("test", "order")
 
         /// POST to http://127.0.0.1:8080/test/order/id=12323
-        
+
         newOrder.post("id", ":id") { req -> String in
 
             guard let id = req.parameters.get("id") else {
@@ -190,10 +190,18 @@ private func testMenu(_ app: Application) {
 
 
 func routes(_ app: Application) throws {
-    
-    
+
+
     testOrder(app)
 
     testMenu(app)
+
+    app.get { req in
+        // print url request
+        let  request = req.url
+        print(request)
+        // return response
+        return "It works!"
+    }
 }
 
