@@ -15,6 +15,10 @@ public struct Order {
     public let paymentOption: String
     public let paymentStatus: String
     public let items: [OrderItem]
+
+    public var orderDateAsInt64: Int64 {
+        Int64(orderDate.timeIntervalSince1970)
+    }
 }
 
 // MARK: - Identifiable
@@ -59,11 +63,23 @@ extension Order: Codable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(UUID.self, forKey: .id)
         userId = try container.decode(UUID.self, forKey: .userId)
-        orderDate = try container.decode(Date.self, forKey: .orderDate)
+        let rawOrderDate = try container.decode(Float64.self, forKey: .orderDate)
+        orderDate = Date(timeIntervalSince1970: rawOrderDate)
         orderStatus = try container.decode(String.self, forKey: .orderStatus)
         paymentOption = try container.decode(String.self, forKey: .paymentOption)
         paymentStatus = try container.decode(String.self, forKey: .paymentStatus)
         items = try container.decode([OrderItem].self, forKey: .items)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(userId, forKey: .userId)
+        try container.encode(orderDate, forKey: .orderDate)
+        try container.encode(orderStatus, forKey: .orderStatus)
+        try container.encode(paymentOption, forKey: .paymentOption)
+        try container.encode(paymentStatus, forKey: .paymentStatus)
+        try container.encode(items, forKey: .items)
     }
 }
 
