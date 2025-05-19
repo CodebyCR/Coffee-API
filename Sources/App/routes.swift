@@ -159,6 +159,8 @@ private func testCoffee(_ app: Application) {
     }
 }
 
+
+
 private func testCake(_ app: Application) {
     let coffee = app.grouped("test", "cake")
 
@@ -269,9 +271,9 @@ private func testOrder(_ app: Application) {
     testOrderGroup.post("id", ":id") { req async throws -> HTTPStatus in
         req.logger.info("Received POST request on /test/order")
 
-        guard let id = req.parameters.get("id") else {
-            throw Abort(.badRequest)
-        }
+//        guard let id = req.parameters.get("id") else {
+//            throw Abort(.badRequest)
+//        }
 
         // 1. Decode the incoming Order object from the request body
         let newOrder: Order // Explicit type annotation helps clarity
@@ -370,11 +372,22 @@ let isoDateFormatter: ISO8601DateFormatter = {
     return formatter
 }()
 
+
+
+
+
+
+
 func routes(_ app: Application) throws {
     testOrder(app)
 
     testCoffee(app)
     testCake(app)
+
+
+    // In deiner routes.swift Datei
+    let imageController = ImageController()
+    app.get("test", "images", ":imageName", use: imageController.getImage)
 
     app.get { req in
         // print url request
@@ -382,5 +395,60 @@ func routes(_ app: Application) throws {
         print(request)
         // return response
         return "It works!"
+    }
+}
+
+
+public struct ImageController {
+    // Vorhandenes Bild über GET-Request ausliefern
+     func getImage(req: Request) async throws -> Response {
+
+         print("[GET] http://127.0.0.1:8080/test/images/\(req.parameters.get("imageName") ?? "")")
+        // Bildnamen aus der URL extrahieren
+        guard let imageName = req.parameters.get("imageName") else {
+            throw Abort(.badRequest, reason: "Kein Bildname angegeben")
+        }
+
+        // Pfad zum Bild auf dem Server
+        let imagePath = "CoffeeAPI/Public/Images/Coffee/Originals/" + imageName
+
+        //  /Volumes/Code/Swift/CoffeeAPI/         Public/Images/Coffee/Originals/Cappuchino.png
+        // /Volumes/Code/Swift/CoffeeAPI/CoffeeAPI/Public/Images/Coffee/Originals/Cappuchino.png
+
+         print("Image path: \(imagePath)")
+
+        // Prüfen, ob die Datei existiert
+        guard FileManager.default.fileExists(atPath: imagePath) else {
+            throw Abort(.notFound, reason: "Bild nicht gefunden")
+        }
+
+        // Bild als Daten laden
+        guard let fileData = FileManager.default.contents(atPath: imagePath) else {
+            throw Abort(.internalServerError, reason: "Fehler beim Lesen der Bilddatei")
+        }
+
+        // Content-Type basierend auf Dateiendung bestimmen
+        let contentType: String
+        if imageName.hasSuffix(".jpg") || imageName.hasSuffix(".jpeg") {
+            contentType = "image/jpeg"
+        } else if imageName.hasSuffix(".png") {
+            contentType = "image/png"
+        } else if imageName.hasSuffix(".gif") {
+            contentType = "image/gif"
+        } else if imageName.hasSuffix(".webp") {
+            contentType = "image/webp"
+        } else {
+            contentType = "application/octet-stream" // Fallback
+        }
+
+        // Response mit Bild erstellen
+        var headers = HTTPHeaders()
+        headers.add(name: .contentType, value: contentType)
+
+        return Response(
+            status: .ok,
+            headers: headers,
+            body: .init(data: fileData)
+        )
     }
 }
