@@ -110,6 +110,7 @@ private func testCoffee(_ app: Application) {
                 'category_number', prod.category_number,
                 'name', prod.name,
                 'price', prod.price,
+                'image_name', prod.original_image_name,
                 'metadata', json_object(
                 'created_at', prod.created_at,
                 'updated_at', prod.updated_at,
@@ -119,14 +120,14 @@ private func testCoffee(_ app: Application) {
                         ELSE json_group_array(ptr.tag_id)
                     END
                 )
-            ) as drink_json
+            ) as product_json
             FROM products prod
             LEFT JOIN products_tags_relation ptr ON prod.id = ptr.product_id
             WHERE prod.id = \(unsafeRaw: id);
         """).all()
 
         for row in rows {
-            return try row.decode(column: "drink_json", as: String.self)
+            return try row.decode(column: "product_json", as: String.self)
         }
 
         throw Abort(.notFound)
