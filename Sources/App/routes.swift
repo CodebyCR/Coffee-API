@@ -374,10 +374,6 @@ let isoDateFormatter: ISO8601DateFormatter = {
 
 
 
-
-
-
-
 func routes(_ app: Application) throws {
     testOrder(app)
 
@@ -387,7 +383,7 @@ func routes(_ app: Application) throws {
 
     // In deiner routes.swift Datei
     let imageController = ImageController()
-    app.get("test", "images", ":imageName", use: imageController.getImage)
+    app.get("test", "images", ":categorie", ":imageName", use: imageController.getImage)
 
     app.get { req in
         // print url request
@@ -403,14 +399,21 @@ public struct ImageController {
     // Vorhandenes Bild über GET-Request ausliefern
      func getImage(req: Request) async throws -> Response {
 
-         print("[GET] http://127.0.0.1:8080/test/images/\(req.parameters.get("imageName") ?? "")")
+         print("[GET] http://127.0.0.1:8080/test/images/\(req.parameters.get("categorie") ?? "")/\(req.parameters.get("imageName") ?? "")")
+
+        // Kategorie aus der URL extrahieren
+        guard let category = req.parameters.get("categorie") else {
+            throw Abort(.badRequest, reason: "Keine Kategorie angegeben")
+        }
+
+
         // Bildnamen aus der URL extrahieren
         guard let imageName = req.parameters.get("imageName") else {
             throw Abort(.badRequest, reason: "Kein Bildname angegeben")
         }
 
         // Pfad zum Bild auf dem Server
-        let imagePath = "CoffeeAPI/Public/Images/Coffee/Originals/" + imageName
+        let imagePath = "CoffeeAPI/Public/Images/\(category)/Originals/\(imageName)"
 
         //  /Volumes/Code/Swift/CoffeeAPI/         Public/Images/Coffee/Originals/Cappuchino.png
         // /Volumes/Code/Swift/CoffeeAPI/CoffeeAPI/Public/Images/Coffee/Originals/Cappuchino.png
