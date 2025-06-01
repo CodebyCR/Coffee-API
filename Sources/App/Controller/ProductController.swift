@@ -23,10 +23,8 @@ public struct ProductController: Sendable {
 
         // The underlying database driver is SQL.
         let rawBuilder = db.raw("""
-            SELECT
-                json_group_array(quote(id)) AS ids
+            SELECT json_group_array(quote(id) ORDER BY category, category_number) AS ids
             FROM products
-            ORDER BY category, category_number;
         """)
 
         let rows = try await rawBuilder.all()
