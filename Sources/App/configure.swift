@@ -10,7 +10,7 @@ public func configure(_ app: Application) async throws {
     let databaseFactory = DatabaseConfigurationFactory.sqlite(.file(databasePath))
     app.databases.use(databaseFactory, as: .sqlite)
 
-//    app.migrations.add(CreateTodo())
+
     // register routes
     try routes(app)
 }
