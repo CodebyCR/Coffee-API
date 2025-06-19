@@ -22,6 +22,7 @@ public struct ProductController: Sendable {
         }
 
         // The underlying database driver is SQL.
+        // TODO: Remove quoting
         let rawBuilder = db.raw("""
             SELECT json_group_array(quote(id) ORDER BY category, category_number) AS ids
             FROM products
@@ -48,11 +49,12 @@ public struct ProductController: Sendable {
             throw Abort(.internalServerError)
         }
 
+        // TODO: Id should be a string ''
         let rows = try await db.raw("""
             SELECT
             json_object(
                 'id', prod.id,
-                'category', prod.category,
+                'category', categorie.name,
                 'category_number', prod.category_number,
                 'name', prod.name,
                 'price', prod.price,
@@ -68,6 +70,7 @@ public struct ProductController: Sendable {
                 )
             ) as product_json
             FROM products prod
+            JOIN product_categories categorie on prod.category = categorie.id
             LEFT JOIN products_tags_relation ptr ON prod.id = ptr.product_id
             WHERE prod.id = \(unsafeRaw: id);
         """).all()
