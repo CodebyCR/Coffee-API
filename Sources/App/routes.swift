@@ -18,8 +18,6 @@ func configure(_ app: Application) throws {
 func routes(_ app: Application) throws {
     // Products
     app.get("test", "coffee", "ids", use: ProductController().getIds)
-
-
     app.get("test", "coffee", "id", ":id", use: ProductController().getProductJsonForId)
 
 
@@ -29,6 +27,7 @@ func routes(_ app: Application) throws {
 
     // Orders
     app.post("test", "order", "id", ":id", use: OrderController().createOrder)
+    app.get("test", "order", "id", ":id", use: OrderController().getJsonForId)
 
 
     app.get { req in

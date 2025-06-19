@@ -50,14 +50,13 @@ public struct OrderController: Sendable {
             INSERT INTO orders (id, user_id, order_date, order_status, payment_option, payment_status)
             VALUES ($1, $2, $3, $4, $5, $6);
             """
-            let orderDateString = isoDateFormatter.string(from: newOrder.orderDate) // TODO: Check format
 
             // 1. Basis-Query erstellen
             var orderQuery = SQLQueryString(insertOrderSQL)
             // 2. Binds AN DIE QUERY anhängen (in der Reihenfolge $1, $2, ...)
             orderQuery.appendInterpolation(bind: newOrder.id.uuidString) // $1
             orderQuery.appendInterpolation(bind: newOrder.userId.uuidString) // $2
-            orderQuery.appendInterpolation(bind: orderDateString) // $3
+            orderQuery.appendInterpolation(bind: newOrder.orderDate) // $3
             orderQuery.appendInterpolation(bind: newOrder.orderStatus) // $4
             orderQuery.appendInterpolation(bind: newOrder.paymentOption) // $5
             orderQuery.appendInterpolation(bind: newOrder.paymentStatus) // $6
@@ -103,53 +102,44 @@ public struct OrderController: Sendable {
         }
     }
 
-    // Definiere die Routen
-    // private func testOrders(_ app: Application) {
-    //    let orders = app.grouped("test", "orders")
-    //
-    //    // GET /test/orders
-    //    orders.get { _ in
-    //        // In einer realen Anwendung würden Sie hier die Daten aus der Datenbank abrufen
-    //        [
-    //            Order(id: UUID(), name: "John Doe", coffeeName: "Hot Coffee", total: 4.50, size: "Medium"),
-    //            Order(id: UUID(), name: "Jane Smith", coffeeName: "Latte", total: 5.00, size: "Large")
-    //        ]
-    //    }
-    //
-    //    // POST /test/orders
-    //    orders.post { req -> Order in
-    //        let order = try req.content.decode(Order.self)
-    //        // In einer realen Anwendung würden Sie hier die Order in der Datenbank speichern
-    //        return order
-    //    }
-    //
-    //    // DELETE /test/orders/:id
-    ////    orders.delete(":id") { req -> HTTPStatus in
-    ////        guard let id = req.parameters.get("id", as: UUID.self) else {
-    ////            throw Abort(.badRequest)
-    ////        }
-    ////        // In einer realen Anwendung würden Sie hier die Order mit der gegebenen ID aus der Datenbank löschen
-    ////        return .ok
-    ////    }
-    //
-    //    // PUT /test/orders/:id
-    //    orders.put(":id") { req -> Order in
-    //        guard req.parameters.get("id", as: UUID.self) != nil else {
-    //            throw Abort(.badRequest)
-    //        }
-    //        let updatedOrder = try req.content.decode(Order.self)
-    //        // In einer realen Anwendung würden Sie hier die Order mit der gegebenen ID in der Datenbank aktualisieren
-    //        return updatedOrder
-    //    }
-    // }
+    @Sendable func getJsonForId(req: Request) async throws -> String {
+        guard let id = req.parameters.get("id") else {
+            throw Abort(.badRequest)
+        }
+        print("[GET] http://127.0.0.1:8080/test/order/id/\(id)")
 
-    // HIER DEFINIEREN: Außerhalb der Funktion, aber in der Datei
-    let isoDateFormatter: ISO8601DateFormatter = {
-        let formatter = ISO8601DateFormatter()
-        // Wähle die Optionen, die dem Format entsprechen, das du in der DB speichern möchtest.
-        // .withInternetDateTime ist ein gängiges Format (z.B. "2023-10-27T10:30:00Z")
-        // .withFractionalSeconds fügt Millisekunden hinzu, falls benötigt.
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter
-    }()
+        guard let db = req.db as? SQLDatabase else {
+            print("Database unavailable")
+            throw Abort(.internalServerError)
+        }
+
+        let rows = try await db.raw("""
+            SELECT
+                json_object(
+                    'id', o.id,
+                    'user_id', o.user_id,
+                    'order_date', o.order_date,
+                    'order_status', o.order_status,
+                    'payment_option', o.payment_option,
+                    'payment_status', o.payment_status,
+                    'items', json_group_array(
+                            json_object(
+                                'id', oi.item_id,
+                                'quantity', oi.item_quantity
+                            )
+                    )
+                ) as order_json
+            FROM orders o
+            LEFT JOIN ordered_items oi ON o.id = oi.order_id
+            WHERE o.id = '\(unsafeRaw: id)'
+            GROUP BY o.id;
+        """).all()
+
+        for row in rows {
+            return try row.decode(column: "order_json", as: String.self)
+        }
+
+        throw Abort(.notFound)
+    }
+
 }
