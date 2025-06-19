@@ -25,9 +25,7 @@ public struct ImageController: Sendable {
         
         // Pfad zum Bild auf dem Server
         let imagePath = "CoffeeAPI/Public/Images/\(category)/Originals/\(imageName)"
-        
-        //  /Volumes/Code/Swift/CoffeeAPI/         Public/Images/Coffee/Originals/Cappuchino.png
-        // /Volumes/Code/Swift/CoffeeAPI/CoffeeAPI/Public/Images/Coffee/Originals/Cappuchino.png
+
         
         print("Image path: \(imagePath)")
         
