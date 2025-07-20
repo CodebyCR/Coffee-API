@@ -39,18 +39,22 @@ public struct ImageController: Sendable {
             throw Abort(.internalServerError, reason: "Fehler beim Lesen der Bilddatei")
         }
         
+
+        // get substring von "." bis ende
+        let imageSuffix = imageName.suffix(while: { $0 != "." }).lowercased()
+
         // Content-Type basierend auf Dateiendung bestimmen
-        let contentType: String
-        if imageName.hasSuffix(".jpg") || imageName.hasSuffix(".jpeg") {
-            contentType = "image/jpeg"
-        } else if imageName.hasSuffix(".png") {
-            contentType = "image/png"
-        } else if imageName.hasSuffix(".gif") {
-            contentType = "image/gif"
-        } else if imageName.hasSuffix(".webp") {
-            contentType = "image/webp"
-        } else {
-            contentType = "application/octet-stream" // Fallback
+        let contentType = switch imageSuffix {
+        case ".jpg", ".jpeg":
+            "image/jpeg"
+        case ".png":
+            "image/png"
+        case ".gif":
+            "image/gif"
+        case ".webp":
+            "image/webp"
+        default:
+            "application/octet-stream" // Fallback für unbekannte Formate
         }
 
         // Response mit Bild erstellen

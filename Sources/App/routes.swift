@@ -6,6 +6,11 @@ import SQLiteNIO
 import Vapor
 
 
+private let productController = ProductController()
+private let imageController = ImageController()
+private let orderController = OrderController()
+private let authentificationController = AuthentificationController()
+
 func configure(_ app: Application) throws {
     // Verwende SQLite als Datenbank
     app.databases.use(.sqlite(.memory), as: .sqlite)
@@ -16,19 +21,24 @@ func configure(_ app: Application) throws {
 }
 
 func routes(_ app: Application) throws {
+    let databaseRoute: PathComponent = "test"
+
     // Products
-    app.get("test", "coffee", "ids", use: ProductController().getIds)
-    app.get("test", "coffee", "id", ":id", use: ProductController().getProductJsonForId)
+    app.get(databaseRoute, "coffee", "ids", use: productController.getIds)
+    app.get(databaseRoute, "coffee", "id", ":id", use: productController.getProductJsonForId)
 
 
     // Images
-    app.get("test", "images", ":categorie", ":imageName", use: ImageController().getImage)
+    app.get(databaseRoute, "images", ":categorie", ":imageName", use: imageController.getImage)
 
 
     // Orders
-    app.post("test", "order", "id", ":id", use: OrderController().createOrder)
-    app.get("test", "order", "id", ":id", use: OrderController().getJsonForId)
+    app.post(databaseRoute, "order", "id", ":id", use: orderController.createOrder)
+    app.get(databaseRoute, "order", "id", ":id", use: orderController.getJsonForId)
 
+    // Authentication
+    app.post(databaseRoute, "authentification", "register", use: authentificationController.registration)
+    app.post(databaseRoute, "authentification", "login", use: authentificationController.login)
 
     app.get { req in
         return "Welcome to CoffeeKit"

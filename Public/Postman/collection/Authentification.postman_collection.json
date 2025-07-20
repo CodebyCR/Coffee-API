@@ -1,0 +1,92 @@
+{
+	"info": {
+		"_postman_id": "8bd989be-33de-4f11-99e2-80ee260a0901",
+		"name": "Authentification",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "46045152",
+		"_collection_link": "https://christophrohde.postman.co/workspace/Christoph-Rohde's-Workspace~fbba3789-5b83-499d-88ab-b1cdc8830452/collection/46045152-8bd989be-33de-4f11-99e2-80ee260a0901?action=share&source=collection_link&creator=46045152"
+	},
+	"item": [
+		{
+			"name": "Register",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"name\": \"testUser\",\n    \"email\": \"test@user.de\",\n    \"password\": \"test1234\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{authentification_url}}/register",
+					"host": [
+						"{{authentification_url}}"
+					],
+					"path": [
+						"register"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Login",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"email\": \"test@user.de\",\n    \"password\": \"test1234\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{authentification_url}}/login",
+					"host": [
+						"{{authentification_url}}"
+					],
+					"path": [
+						"login"
+					]
+				}
+			},
+			"response": []
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "authentification_url",
+			"value": "127.0.0.1:8080/test/authentification",
+			"type": "string"
+		}
+	]
+}
