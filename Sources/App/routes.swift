@@ -37,8 +37,8 @@ func routes(_ app: Application) throws {
     app.get(databaseRoute, "order", "id", ":id", use: orderController.getJsonForId)
 
     // Authentication
-    app.post(databaseRoute, "authentification", "register", use: authentificationController.registration)
-    app.post(databaseRoute, "authentification", "login", use: authentificationController.login)
+    app.post(databaseRoute, "authentication", "register", use: authentificationController.registration)
+    app.post(databaseRoute, "authentication", "login", use: authentificationController.login)
 
     app.get { req in
         return "Welcome to CoffeeKit"

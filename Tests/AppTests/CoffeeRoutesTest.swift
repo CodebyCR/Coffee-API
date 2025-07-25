@@ -32,18 +32,4 @@ final class CoffeeRoutesTest: XCTestCase {
 
     }
 
-    func testHashFunction() throws {
-
-        let authentificationController = AuthentificationController()
-        let (hashedPassword, salt) = try authentificationController.hashPassword(
-            password: "test",
-            salt: "salt"
-        )
-        print("Hashed Password: \(hashedPassword)")
-        // $2b$12$nMfnl5DTPAMtOfuj6Qr9Ru1iggKRH4n2PmIfZ.0kxLQnlbJ/sbXFy
-        // $2b$12$ea02tBU0xseSxIGz.dWzYOzE9LEPkJ/Tvabidq.Myd6.1DopgRuVy
-
-
-    }
-
 }

@@ -16,7 +16,7 @@ struct AuthentificationController {
     @Sendable func registration(req: Request) async throws -> HTTPResponseStatus {
         req.logger.info("Received POST request on /test/authentication/registration")
 
-        print("[POST] http://127.0.0.1:8080/test/authentification/register")
+        print("[ POST ] http://127.0.0.1:8080/test/authentification/register")
 
         guard let userRegistrationJson = try? req.content.decode([String:String].self) else {
             req.logger.error("Failed to decode user registration JSON.")
@@ -214,7 +214,11 @@ struct AuthentificationController {
             throw Abort(.internalServerError, reason: "Database error during token generation.")
         }
 
-        return token
+        return """
+            {
+                "token" : "\(token)"
+            }
+        """
     }
 
 }
