@@ -14,7 +14,7 @@ public func configure(_ app: Application) async throws {
     }
 
     // Set IP
-    if let ip = Environment.get("DATABASE_HOSTNAME") {
+    if let ip = Environment.get("--hostname") {
         app.logger.info("Using IP address from environment: \(ip)")
         app.http.server.configuration.hostname = ip
     }
@@ -24,7 +24,7 @@ public func configure(_ app: Application) async throws {
     }
 
     // Set Port
-    if let port = Environment.get("DATABASE_PORT") {
+    if let port = Environment.get("--port") {
         app.logger.info("Using port from environment: \(port)")
         app.http.server.configuration.port = Int(port) ?? 8080
     } else {
@@ -33,14 +33,14 @@ public func configure(_ app: Application) async throws {
     }
 
     // Set DB Path
-    if let databasePath = Environment.get("database_path") {
+    if let databasePath = Environment.get("--database-path") {
         app.logger.info("Using database path from environment: \(databasePath)")
         let databaseFactory = DatabaseConfigurationFactory.sqlite(.file(databasePath))
         app.databases.use(databaseFactory, as: .sqlite)
     } else {
         app.logger.warning("No database path specified, using default path")
-        let databasePath = app.directory.workingDirectory + "CoffeeAPI/Databases/CoffeeLover.sqlite"
-        print("Database path: \(databasePath)")
+        let databasePath = app.directory.workingDirectory + "Databases/CoffeeLover.sqlite"
+        app.logger.info("Database path: \(databasePath)")
         let databaseFactory = DatabaseConfigurationFactory.sqlite(.file(databasePath))
         app.databases.use(databaseFactory, as: .sqlite)
     }
@@ -53,9 +53,10 @@ public func configure(_ app: Application) async throws {
     app.middleware.use(FileMiddleware(publicDirectory: app.directory.publicDirectory))
 
 
-
-
     // register routes
     try routes(app)
 //    print(app.routes.all)
+    app.logger.info("☕      Welcome to Coffee-API!      ☕")
+
+    app.logger.info("Access the API at: http://\(app.http.server.configuration.hostname):\(app.http.server.configuration.port)") 
 }
