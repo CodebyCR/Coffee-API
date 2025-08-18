@@ -27,6 +27,9 @@ let package = Package(
                 .product(name: "NIOCore", package: "swift-nio"),
                 .product(name: "NIOPosix", package: "swift-nio"),
             ],
+            resources: [
+                .process("Resources"),
+            ],
             swiftSettings: swiftSettings
         ),
         .testTarget(
@@ -34,6 +37,9 @@ let package = Package(
             dependencies: [
                 .target(name: "App"),
                 .product(name: "XCTVapor", package: "vapor"),
+            ],
+            resources: [
+                .process("Resources"),
             ],
             swiftSettings: swiftSettings
         ),

@@ -5,7 +5,7 @@ import Vapor
 
 // configures your application
 public func configure(_ app: Application) async throws {
-    let envPath = app.directory.workingDirectory.appending(".env") 
+    let envPath = app.directory.workingDirectory.appending(".env")
     if FileManager.default.fileExists(atPath: envPath) {
         app.logger.info("Loading environment variables from \(envPath)")
 //        try app.environment.arguments = try Environment.
@@ -13,12 +13,13 @@ public func configure(_ app: Application) async throws {
         app.logger.warning("No .env file found at \(envPath), using default environment variables")
     }
 
+
     // Set IP
     if let ip = Environment.get("--hostname") {
         app.logger.info("Using IP address from environment: \(ip)")
         app.http.server.configuration.hostname = ip
-    }
-    else {
+
+    } else {
         app.logger.warning("No IP address specified, using default '127.0.0.1' aka localhost")
         app.http.server.configuration.hostname = "127.0.0.1"
     }
@@ -33,30 +34,24 @@ public func configure(_ app: Application) async throws {
     }
 
     // Set DB Path
-    if let databasePath = Environment.get("--database-path") {
-        app.logger.info("Using database path from environment: \(databasePath)")
-        let databaseFactory = DatabaseConfigurationFactory.sqlite(.file(databasePath))
-        app.databases.use(databaseFactory, as: .sqlite)
-    } else {
-        app.logger.warning("No database path specified, using default path")
-        let databasePath = app.directory.workingDirectory + "Databases/CoffeeLover.sqlite"
-        app.logger.info("Database path: \(databasePath)")
-        let databaseFactory = DatabaseConfigurationFactory.sqlite(.file(databasePath))
-        app.databases.use(databaseFactory, as: .sqlite)
+    guard let databasePath = Bundle.module.path(forResource: "CoffeeLover", ofType: "sqlite") else {
+        app.logger.error("Database file not found in bundle")
+        return
     }
 
-    // User Database
-    
+    app.logger.info("Database path from bundle: \(databasePath)")
+    let databaseFactory = DatabaseConfigurationFactory.sqlite(.file(databasePath))
+    app.databases.use(databaseFactory, as: .sqlite)
 
+    // User Database
 
     app.routes.caseInsensitive = true
     app.middleware.use(FileMiddleware(publicDirectory: app.directory.publicDirectory))
-
 
     // register routes
     try routes(app)
 //    print(app.routes.all)
     app.logger.info("☕      Welcome to Coffee-API!      ☕")
 
-    app.logger.info("Access the API at: http://\(app.http.server.configuration.hostname):\(app.http.server.configuration.port)") 
+    app.logger.info("Access the API at: http://\(app.http.server.configuration.hostname):\(app.http.server.configuration.port)")
 }
