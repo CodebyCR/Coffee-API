@@ -13,7 +13,6 @@ public func configure(_ app: Application) async throws {
         app.logger.warning("No .env file found at \(envPath), using default environment variables")
     }
 
-
     // Set IP
     if let ip = Environment.get("--hostname") {
         app.logger.info("Using IP address from environment: \(ip)")
@@ -47,6 +46,13 @@ public func configure(_ app: Application) async throws {
 
     app.routes.caseInsensitive = true
     app.middleware.use(FileMiddleware(publicDirectory: app.directory.publicDirectory))
+
+    // Mail Configuration
+//    app.smtp.configuration.host = "smtp.server"
+    app.smtp.configuration.hostname =  "smtp.gmail.com"
+    app.smtp.configuration.port = 587 // attention no secure connection
+    app.smtp.configuration.signInMethod = .credentials(username: "johndoe", password: "passw0rd")
+    app.smtp.configuration.secure = .startTls // .ssl
 
     // register routes
     try routes(app)

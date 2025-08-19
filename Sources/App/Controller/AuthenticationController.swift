@@ -13,12 +13,14 @@ import SQLiteNIO
 import Vapor
 
 struct AuthentificationController {
+    let mailController = MailController()
+
     @Sendable func registration(req: Request) async throws -> HTTPResponseStatus {
         req.logger.info("Received POST request on /test/authentication/registration")
 
         print("[ POST ] http://127.0.0.1:8080/test/authentification/register")
 
-        guard let userRegistrationJson = try? req.content.decode([String:String].self) else {
+        guard let userRegistrationJson = try? req.content.decode([String: String].self) else {
             req.logger.error("Failed to decode user registration JSON.")
             throw Abort(.badRequest, reason: "Invalid registration format.")
         }
@@ -52,7 +54,6 @@ struct AuthentificationController {
             throw Abort(.internalServerError)
         }
 
-
         let userDataDbPath = Environment.get("UserData") ?? "/Users/christoph_rohde/Databases/UserData.sqlite"
 
         let query1 = """
@@ -61,14 +62,14 @@ struct AuthentificationController {
         var attachQuery = SQLQueryString(query1)
         attachQuery.appendInterpolation(bind: userDataDbPath)
 
-
         let query2 = """
             INSERT INTO userData.users (id, name, email, password, salt)
             VALUES ($1, $2, $3, $4, $5);
         """
 
+        let newUserId = UUID().uuidString
         var insertQuery = SQLQueryString(query2)
-        insertQuery.appendInterpolation(bind: UUID().uuidString) // $2 - Unique user ID
+        insertQuery.appendInterpolation(bind: newUserId) // $2 - Unique user ID
         insertQuery.appendInterpolation(bind: username) // $3 - Username
         insertQuery.appendInterpolation(bind: email) // $4 - Email
         insertQuery.appendInterpolation(bind: hashedPassword) // $5 - Hashed Password
@@ -83,6 +84,20 @@ struct AuthentificationController {
             req.logger.error("Failed to insert user into database: \(error)")
             throw Abort(.internalServerError, reason: "Database error during registration.")
         }
+
+        let token = "cl-\(UUID().uuidString)"
+
+        try await storeToken(newUserId, token, req, db, email)
+
+        try await mailController
+            .sendConfirmAccountMail(
+                to: email,
+                username: username,
+                token: token,
+                request: req
+            )
+
+        req.logger.info("User \(username) registered successfully with email: \(email)")
 
         return HTTPResponseStatus.ok
     }
@@ -99,12 +114,33 @@ struct AuthentificationController {
         return (hashedPassword, salt)
     }
 
+    fileprivate func storeToken(_ userId: String, _ token: String, _ req: Request, _ db: any SQLDatabase, _ email: String) async throws {
+        let tokenQuery = """
+            INSERT INTO userData.active_tokens (id, user_id, token)
+            VALUES ($1, $2, $3);
+        """
+
+        var tokenQueryString = SQLQueryString(tokenQuery)
+        tokenQueryString.appendInterpolation(bind: UUID().uuidString)
+        tokenQueryString.appendInterpolation(bind: userId)
+        tokenQueryString.appendInterpolation(bind: token)
+
+        req.logger.debug("Executing Token Insert Query: \(tokenQueryString)")
+        do {
+            try await db.raw(tokenQueryString).run()
+            req.logger.info("Token generated and stored successfully for user \(email).")
+        } catch {
+            req.logger.error("Failed to insert token into database: \(error)")
+            throw Abort(.internalServerError, reason: "Database error during token generation.")
+        }
+    }
+
     @Sendable func login(req: Request) async throws -> String {
         req.logger.info("Received POST request on /test/authentication/login")
 
         print("[POST] http://127.0.0.1:8080/test/authentification/login")
 
-        guard let userLoginJson = try? req.content.decode([String:String].self) else {
+        guard let userLoginJson = try? req.content.decode([String: String].self) else {
             req.logger.error("Failed to decode user registration JSON.")
             throw Abort(.badRequest, reason: "Invalid registration format.")
         }
@@ -195,24 +231,7 @@ struct AuthentificationController {
         print("User \(email) logged in successfully with ID: \(userId)")
 
         let token = "cl-\(UUID().uuidString)"
-        let tokenQuery = """
-            INSERT INTO userData.active_tokens (id, user_id, token)
-            VALUES ($1, $2, $3);
-        """
-
-        var tokenQueryString = SQLQueryString(tokenQuery)
-        tokenQueryString.appendInterpolation(bind: UUID().uuidString)
-        tokenQueryString.appendInterpolation(bind: userId)
-        tokenQueryString.appendInterpolation(bind: token)
-
-        req.logger.debug("Executing Token Insert Query: \(tokenQueryString)")
-        do {
-            try await db.raw(tokenQueryString).run()
-            req.logger.info("Token generated and stored successfully for user \(email).")
-        } catch {
-            req.logger.error("Failed to insert token into database: \(error)")
-            throw Abort(.internalServerError, reason: "Database error during token generation.")
-        }
+        try await storeToken(userId, token, req, db, email)
 
         return """
             {
@@ -220,5 +239,4 @@ struct AuthentificationController {
             }
         """
     }
-
 }
