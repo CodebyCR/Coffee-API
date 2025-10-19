@@ -15,12 +15,12 @@ public struct ImageController: Sendable {
         
         // Kategorie aus der URL extrahieren
         guard let category = req.parameters.get("categorie") else {
-            throw Abort(.badRequest, reason: "Keine Kategorie angegeben")
+            throw Abort(.badRequest, reason: "No 'categorie' Supplied.")
         }
         
         // Bildnamen aus der URL extrahieren
         guard let imageName = req.parameters.get("imageName") else {
-            throw Abort(.badRequest, reason: "Kein Bildname angegeben")
+            throw Abort(.badRequest, reason: "No 'imageName' supplied.")
         }
         
         // Pfad zum Bild auf dem Server
@@ -31,12 +31,12 @@ public struct ImageController: Sendable {
         
         // Prüfen, ob die Datei existiert
         guard FileManager.default.fileExists(atPath: imagePath) else {
-            throw Abort(.notFound, reason: "Bild nicht gefunden")
+            throw Abort(.notFound, reason: "Image not found.")
         }
         
         // Bild als Daten laden
         guard let fileData = FileManager.default.contents(atPath: imagePath) else {
-            throw Abort(.internalServerError, reason: "Fehler beim Lesen der Bilddatei")
+            throw Abort(.internalServerError, reason: "Image unreadable.")
         }
         
 
