@@ -38,10 +38,10 @@ func routes(_ app: Application) throws {
     app.post(databaseRoute, "authentication", "login", use: authentificationController.login)
 
     app.get { _ in
-        "Welcome to CoffeeKit"
+        "☕      Welcome to Coffee-API      ☕"
     }
 
     app.get("docs") { _ in
-        "Welcome to CoffeeKit"
+        "☕      Welcome to Coffee-API      ☕"
     }
 }
