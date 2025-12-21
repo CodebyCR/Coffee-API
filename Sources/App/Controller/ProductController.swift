@@ -60,8 +60,8 @@ public struct ProductController: Sendable {
                 'price', prod.price,
                 'image_name', prod.original_image_name,
                 'metadata', json_object(
-                'created_at', prod.created_at,
-                'updated_at', prod.updated_at,
+                'created_at', unixepoch(prod.created_at),
+                'updated_at', unixepoch(prod.updated_at),
                 'tag_ids',
                     CASE
                         WHEN COUNT(ptr.tag_id) = 1 AND ptr.tag_id IS NULL THEN '[]'
