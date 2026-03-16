@@ -10,11 +10,11 @@ import XCTVapor
 
 final class CoffeeRoutesTest: XCTestCase {
 
-    func testCoffeeGetById() throws {
-        let app = Application(.testing)
+    func testCoffeeGetById() async throws {
+        let app = try await Application.make(.testing)
 
         defer { app.shutdown() }
-        try configure(app)
+        try await configure(app)
         app.databases.use(.sqlite(.memory), as: .sqlite)
 
         // Registriere die Routen
