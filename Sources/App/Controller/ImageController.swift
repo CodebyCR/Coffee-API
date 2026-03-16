@@ -21,11 +21,12 @@ public struct ImageController: Sendable {
             throw Abort(.badRequest, reason: "No 'imageName' supplied.")
         }
 
+//        let newImageName = imageName.replacing(".png", with: ".heic")
         print("[GET] http://127.0.0.1:8080/test/images/\(category)/\(imageName)")
 
 
         // Pfad zum Bild auf dem Server
-        let imagePath = req.application.directory.publicDirectory + "Images/\(category)/Originals/\(imageName)"
+        let imagePath = req.application.directory.publicDirectory + "Images/\(category)/Compressed/\(imageName)"
 
         print("Image path: \(imagePath)")
 
@@ -44,6 +45,8 @@ public struct ImageController: Sendable {
 
         // Content-Type basierend auf Dateiendung bestimmen
         let contentType = switch imageSuffix {
+        case ".heic":
+            "image/heic"
         case ".jpg", ".jpeg":
             "image/jpeg"
         case ".png":
