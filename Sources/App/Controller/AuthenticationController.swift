@@ -12,8 +12,8 @@ import Foundation
 import SQLiteNIO
 import Vapor
 
-struct AuthentificationController {
-    @Sendable func registration(req: Request) async throws -> HTTPResponseStatus {
+struct AuthentificationController: Sendable {
+    func registration(req: Request) async throws -> HTTPResponseStatus {
         req.logger.info("Received POST request on /test/authentication/registration")
 
         print("[ POST ] http://127.0.0.1:8080/test/authentification/register")
@@ -68,18 +68,24 @@ struct AuthentificationController {
         """
 
         var insertQuery = SQLQueryString(query2)
-        insertQuery.appendInterpolation(bind: UUID().uuidString) // $2 - Unique user ID
-        insertQuery.appendInterpolation(bind: username) // $3 - Username
-        insertQuery.appendInterpolation(bind: email) // $4 - Email
-        insertQuery.appendInterpolation(bind: hashedPassword) // $5 - Hashed Password
-        insertQuery.appendInterpolation(bind: salt) // $6 - Salt
+        insertQuery.appendInterpolation(bind: UUID().uuidString)    // $2 - Unique user ID
+        insertQuery.appendInterpolation(bind: username)             // $3 - Username
+        insertQuery.appendInterpolation(bind: email)                // $4 - Email
+        insertQuery.appendInterpolation(bind: hashedPassword)       // $5 - Hashed Password
+        insertQuery.appendInterpolation(bind: salt)                 // $6 - Salt
 
         req.logger.debug("Executing User Insert Query: \(insertQuery)")
         do {
+            print("Step 1")
             try await db.raw(attachQuery).run()
+            print("Step 2")
             try await db.raw(insertQuery).run()
             req.logger.info("User registration successful for \(username).")
         } catch {
+            //return HTTPResponseStatus.ok
+            
+            
+            // Currently throw an error if the database is already attached.
             req.logger.error("Failed to insert user into database: \(error)")
             throw Abort(.internalServerError, reason: "Database error during registration.")
         }
@@ -99,7 +105,7 @@ struct AuthentificationController {
         return (hashedPassword, salt)
     }
 
-    @Sendable func login(req: Request) async throws -> String {
+    func login(req: Request) async throws -> String {
         req.logger.info("Received POST request on /test/authentication/login")
 
         print("[POST] http://127.0.0.1:8080/test/authentification/login")
@@ -138,7 +144,7 @@ struct AuthentificationController {
             req.logger.info("User data database attached successfully.")
         } catch {
             req.logger.error("Failed to attach user data database: \(error)")
-            throw Abort(.internalServerError, reason: "Database error during login.")
+            //throw Abort(.internalServerError, reason: "Database error during login.")
         }
 
         // get data from userData.users table
@@ -221,4 +227,11 @@ struct AuthentificationController {
         """
     }
 
+
+    func refreshToken(request: Request) async throws -> String {
+        request.logger.info("Received POST request on /test/authentication/refresh")
+        
+        return "currently unimplemented"
+    }
+    
 }

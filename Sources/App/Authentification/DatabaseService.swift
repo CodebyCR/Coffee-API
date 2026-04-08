@@ -16,7 +16,7 @@ struct DatabaseService: DatabaseServiceProtocol {
     private let userDataDbPath: String
 
     init() {
-        self.userDataDbPath = Environment.get("UserData") ?? "/Users/christoph_rohde/Databases/UserData.sqlite"
+        self.userDataDbPath = Environment.get("UserData") ?? "/Volumes/Code/Swift/CoffeeAPI/CoffeeAPI/Sources/App/Resources/Databases/UserData.sqlite"
     }
 
     func attachUserDatabase(_ db: SQLDatabase) async throws {
