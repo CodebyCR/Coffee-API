@@ -13,6 +13,8 @@ import SQLiteNIO
 import Vapor
 
 struct AuthentificationController: Sendable {
+    
+    @Sendable
     func registration(req: Request) async throws -> HTTPResponseStatus {
         req.logger.info("Received POST request on /test/authentication/registration")
 
@@ -105,6 +107,7 @@ struct AuthentificationController: Sendable {
         return (hashedPassword, salt)
     }
 
+    @Sendable
     func login(req: Request) async throws -> String {
         req.logger.info("Received POST request on /test/authentication/login")
 
@@ -200,7 +203,9 @@ struct AuthentificationController: Sendable {
 
         print("User \(email) logged in successfully with ID: \(userId)")
 
-        let token = "cl-\(UUID().uuidString)"
+        let accessToken = generateAccessToken()
+        let refreshToken = "rt-\(UUID().uuidString)"
+        
         let tokenQuery = """
             INSERT INTO userData.active_tokens (id, user_id, token)
             VALUES ($1, $2, $3);
@@ -209,7 +214,7 @@ struct AuthentificationController: Sendable {
         var tokenQueryString = SQLQueryString(tokenQuery)
         tokenQueryString.appendInterpolation(bind: UUID().uuidString)
         tokenQueryString.appendInterpolation(bind: userId)
-        tokenQueryString.appendInterpolation(bind: token)
+        tokenQueryString.appendInterpolation(bind: refreshToken)
 
         req.logger.debug("Executing Token Insert Query: \(tokenQueryString)")
         do {
@@ -222,16 +227,95 @@ struct AuthentificationController: Sendable {
 
         return """
             {
-                "token" : "\(token)"
+                "accessToken" : "\(accessToken)",
+                "refreshToken" : "\(refreshToken)",
+                "token" : "\(accessToken)"
             }
         """
     }
 
 
-    func refreshToken(request: Request) async throws -> String {
-        request.logger.info("Received POST request on /test/authentication/refresh")
+    @Sendable
+    func refreshToken(req: Request) async throws -> String {
+        req.logger.info("Received POST request on /test/authentication/refresh")
         
-        return "currently unimplemented"
+        struct RefreshRequest: Content {
+            let refreshToken: String
+        }
+        
+        guard let refreshRequest = try? req.content.decode(RefreshRequest.self) else {
+            throw Abort(.badRequest, reason: "Invalid refresh request.")
+        }
+        
+        guard let db = req.db as? SQLDatabase else {
+            req.logger.error("Database unavailable")
+            throw Abort(.internalServerError)
+        }
+        
+        // Attach the user data database
+        let userDataDbPath = Environment.get("UserData") ?? "/Users/christoph_rohde/Databases/UserData.sqlite"
+        let attachQuery = SQLQueryString("ATTACH DATABASE $1 AS userData;")
+        var attachQueryWithBind = attachQuery
+        attachQueryWithBind.appendInterpolation(bind: userDataDbPath)
+        
+        // Try to attach, ignore if already attached
+        _ = try? await db.raw(attachQueryWithBind).run()
+        
+        // Look up the token
+        let lookupQuery = "SELECT user_id FROM userData.active_tokens WHERE token = $1;"
+        var lookupQueryString = SQLQueryString(lookupQuery)
+        lookupQueryString.appendInterpolation(bind: refreshRequest.refreshToken)
+        
+        guard let rows = try await db.raw(lookupQueryString).all().first else {
+            req.logger.error("Refresh token not found: \(refreshRequest.refreshToken)")
+            throw Abort(.unauthorized, reason: "Invalid refresh token.")
+        }
+        
+        let userId = try rows.decode(column: "user_id", as: String.self)
+        
+        // Generate new tokens
+        let newAccessToken = generateAccessToken()
+        let newRefreshToken = "rt-\(UUID().uuidString)"
+        
+        // Update database (replace old refresh token with new one)
+        let deleteQuery = "DELETE FROM userData.active_tokens WHERE token = $1;"
+        var deleteQueryString = SQLQueryString(deleteQuery)
+        deleteQueryString.appendInterpolation(bind: refreshRequest.refreshToken)
+        try await db.raw(deleteQueryString).run()
+        
+        let insertQuery = "INSERT INTO userData.active_tokens (id, user_id, token) VALUES ($1, $2, $3);"
+        var insertQueryString = SQLQueryString(insertQuery)
+        insertQueryString.appendInterpolation(bind: UUID().uuidString)
+        insertQueryString.appendInterpolation(bind: userId)
+        insertQueryString.appendInterpolation(bind: newRefreshToken)
+        try await db.raw(insertQueryString).run()
+        
+        return """
+            {
+                "accessToken" : "\(newAccessToken)",
+                "refreshToken" : "\(newRefreshToken)"
+            }
+        """
+    }
+
+    private func generateAccessToken() -> String {
+        let header = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9" // {"alg":"HS256","typ":"JWT"}
+        let exp = Date().addingTimeInterval(3600).timeIntervalSince1970
+        let payload: [String: Any] = [
+            "exp": exp,
+            "iat": Date().timeIntervalSince1970,
+            "sub": "user"
+        ]
+        
+        guard let payloadData = try? JSONSerialization.data(withJSONObject: payload),
+              let payloadBase64 = payloadData.base64EncodedString()
+                .replacingOccurrences(of: "+", with: "-")
+                .replacingOccurrences(of: "/", with: "_")
+                .replacingOccurrences(of: "=", with: "") as String? else {
+            return "invalid.payload.signature"
+        }
+        
+        return "\(header).\(payloadBase64).signature"
     }
     
 }
