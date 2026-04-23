@@ -42,6 +42,7 @@ func routes(_ app: Application) throws {
     // Orders
     protectedGroup.post("order", "id", ":id", use: orderController.createOrder)
     protectedGroup.get("order", "id", ":id", use: orderController.getJsonForId)
+    protectedGroup.get("order", "history", ":before", use: orderController.getHistory)
     
     // WebSocket
     app.webSocket(databaseRoute, "order", "status", ":id", onUpgrade: realTimeOrderController.subscribeToOrderUpdates)

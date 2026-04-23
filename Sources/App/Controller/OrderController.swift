@@ -142,4 +142,34 @@ public struct OrderController: Sendable {
         throw Abort(.notFound)
     }
 
+    
+    @Sendable func getHistory(req: Request) async throws -> String {
+        guard let before = req.parameters.get("before") else {
+            throw Abort(.badRequest)
+        }
+        print("[GET] http://127.0.0.1:8080/test/order/history/\(before)")
+
+        guard let db = req.db as? SQLDatabase else {
+            print("Database unavailable")
+            throw Abort(.internalServerError)
+        }
+
+        let rows = try await db.raw("""
+            SELECT
+                json_group_array(json(order_json)) AS order_json
+            FROM (
+                SELECT
+                    order_json
+                FROM ORDER_JSON_VIEW
+                WHERE order_date < CAST('\(unsafeRaw: before)' AS REAL)
+                LIMIT 20
+            );
+        """).all()
+
+        for row in rows {
+            return try row.decode(column: "order_json", as: String.self)
+        }
+
+        throw Abort(.notFound)
+    }
 }

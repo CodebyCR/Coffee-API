@@ -49,7 +49,6 @@ public struct ProductController: Sendable {
             throw Abort(.internalServerError)
         }
 
-        // TODO: Id should be a string ''
         let rows = try await db.raw("""
             SELECT
             json_object(
