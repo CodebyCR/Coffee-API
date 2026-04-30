@@ -14,11 +14,12 @@ import Vapor
 
 public struct OrderController: Sendable {
     @Sendable func createOrder(req: Request) async throws -> HTTPResponseStatus {
-        req.logger.info("Received POST request on /test/order")
-
-        //        guard let id = req.parameters.get("id") else {
-        //            throw Abort(.badRequest)
-        //        }
+        guard let urlId = req.parameters.get("id") else {
+            req.logger.error("Missing ID in URL parameter")
+            throw Abort(.badRequest, reason: "Order ID in URL is required.")
+        }
+        
+        req.logger.info("Received POST request on /test/order/id/\(urlId)")
 
         // 1. Decode the incoming Order object from the request body
         let newOrder: Order // Explicit type annotation helps clarity
@@ -30,20 +31,66 @@ public struct OrderController: Sendable {
             throw Abort(.badRequest, reason: "Invalid Order format: \(error.localizedDescription)")
         }
 
-        // 2. Get database connections (assuming db1 for orders, db2 for items)
-        guard let sqlDb1 = req.db(.sqlite) as? any SQLDatabase, // DB for 'orders' table
-              let sqlDb2 = req.db(.sqlite) as? any SQLDatabase // DB for 'ordered_items' table
-        else {
-            req.logger.critical("Database connections not available or don't support raw SQL.")
+        // 2. Get database connection
+        guard let sqlDb = req.db(.sqlite) as? any SQLDatabase else {
+            req.logger.critical("Database connection not available or doesn't support raw SQL.")
             throw Abort(.internalServerError, reason: "Database configuration error.")
         }
-        req.logger.info("Database connections obtained.")
+        
+        let userId = newOrder.userId.uuidString
+        req.logger.info("Database connection obtained. Processing order for user: \(userId)")
 
-        // --- ATOMICITY WARNING ---
-        // Operations across db1 and db2 are NOT atomic. Failure during item insertion
-        // will leave the order in db1 without corresponding items in db2.
-        // Consider Sagas, Outbox pattern, or single DB if atomicity is critical.
-        // ---
+        // 2.1 Attach UserData database
+        let userDataDbPath = Environment.get("UserData") ?? "/Volumes/Code/UserData.sqlite"
+        let attachQuery = "ATTACH DATABASE $1 AS userData;"
+        var attachQueryString = SQLQueryString(attachQuery)
+        attachQueryString.appendInterpolation(bind: userDataDbPath)
+        
+        do {
+            try await sqlDb.raw(attachQueryString).run()
+            req.logger.info("User data database attached successfully.")
+        } catch {
+            // Ignore error if already attached, but log other issues
+            req.logger.debug("Attach info: \(error.localizedDescription)")
+        }
+
+        // Check if user exists in local database
+        let userCheckQuery = "SELECT id FROM users WHERE id = $1;"
+        var userCheckQueryString = SQLQueryString(userCheckQuery)
+        userCheckQueryString.appendInterpolation(bind: userId)
+        
+        do {
+            let userRows = try await sqlDb.raw(userCheckQueryString).all()
+            if userRows.isEmpty {
+                req.logger.info("User \(userId) not found in local users table. Checking in userData...")
+                
+                let remoteUserCheckQuery = "SELECT id, name, email FROM userData.users WHERE id = $1;"
+                var remoteUserCheckQueryString = SQLQueryString(remoteUserCheckQuery)
+                remoteUserCheckQueryString.appendInterpolation(bind: userId)
+                
+                let remoteRows = try await sqlDb.raw(remoteUserCheckQueryString).all()
+                if let remoteUser = remoteRows.first {
+                    let name = (try? remoteUser.decode(column: "name", as: String.self)) ?? "User"
+                    let email = (try? remoteUser.decode(column: "email", as: String.self)) ?? ""
+                    
+                    req.logger.info("Syncing user \(userId) from userData to local users table.")
+                    let syncQuery = "INSERT INTO users (id, name, email) VALUES ($1, $2, $3);"
+                    var syncQueryString = SQLQueryString(syncQuery)
+                    syncQueryString.appendInterpolation(bind: userId)
+                    syncQueryString.appendInterpolation(bind: name)
+                    syncQueryString.appendInterpolation(bind: email)
+                    try await sqlDb.raw(syncQueryString).run()
+                } else {
+                    req.logger.error("User with ID \(userId) not found in userData either.")
+                    throw Abort(.badRequest, reason: "User not found. Please register or log in again.")
+                }
+            }
+        } catch let abort as Abort {
+            throw abort
+        } catch {
+            req.logger.error("Failed to check for or sync user: \(error)")
+            throw Abort(.internalServerError, reason: "Database error during user validation.")
+        }
 
         do {
             let insertOrderSQL = """
@@ -53,52 +100,56 @@ public struct OrderController: Sendable {
 
             // 1. Basis-Query erstellen
             var orderQuery = SQLQueryString(insertOrderSQL)
-            // 2. Binds AN DIE QUERY anhängen (in der Reihenfolge $1, $2, ...)
-            orderQuery.appendInterpolation(bind: newOrder.id.uuidString) // $1
-            orderQuery.appendInterpolation(bind: newOrder.userId.uuidString) // $2
-            orderQuery.appendInterpolation(bind: newOrder.orderDate) // $3
+            // 2. Binds AN DIE QUERY anhängen
+            orderQuery.appendInterpolation(bind: urlId) // $1
+            orderQuery.appendInterpolation(bind: userId) // $2
+            orderQuery.appendInterpolation(bind: newOrder.orderDate.timeIntervalSince1970) // $3
             orderQuery.appendInterpolation(bind: newOrder.orderStatus) // $4
             orderQuery.appendInterpolation(bind: newOrder.paymentOption) // $5
             orderQuery.appendInterpolation(bind: newOrder.paymentStatus) // $6
 
-            // 3. Fertige Query an raw().run() übergeben
-            req.logger.debug("Executing Order Insert")
-            try await sqlDb1.raw(orderQuery).run()
+            req.logger.debug("Executing Order Insert for ID: \(urlId)")
+            try await sqlDb.raw(orderQuery).run()
 
-            req.logger.info("Successfully inserted order into DB1 with ID \(newOrder.id.uuidString).")
+            req.logger.info("Successfully inserted order into orders table.")
 
-            // --- KORRIGIERTER TEIL 2: OrderItem Insert (innerhalb der Schleife) ---
             let insertItemSQLBase = """
             INSERT INTO ordered_items (id, order_id, item_id, item_quantity)
             VALUES ($1, $2, $3, $4);
             """
 
-            req.logger.debug("Preparing to insert \(newOrder.items.count) items into ordered_items table.")
-
             for item in newOrder.items {
-                // 1. Basis-Query für dieses Item erstellen
+                let productId = item.id.uuidString.lowercased()
+                
+                // Check if product exists
+                let productCheckQuery = "SELECT id FROM products WHERE id = $1;"
+                var productCheckQueryString = SQLQueryString(productCheckQuery)
+                productCheckQueryString.appendInterpolation(bind: productId)
+                
+                let productRows = try await sqlDb.raw(productCheckQueryString).all()
+                if productRows.isEmpty {
+                    req.logger.error("Product with ID \(productId) not found in products table.")
+                    throw Abort(.badRequest, reason: "Product with ID \(productId) does not exist.")
+                }
+
                 var itemQuery = SQLQueryString(insertItemSQLBase)
-                // 2. Binds AN DIE QUERY anhängen (in der Reihenfolge $1, $2, ...)
                 itemQuery.appendInterpolation(bind: UUID().uuidString) // $1: id (PK)
-                itemQuery.appendInterpolation(bind: newOrder.id.uuidString) // $2: order_id (FK -> Order ID)
-                itemQuery.appendInterpolation(bind: item.id.uuidString.lowercased()) // $3: item_id (FK -> Product ID)
+                itemQuery.appendInterpolation(bind: urlId) // $2: order_id
+                itemQuery.appendInterpolation(bind: productId) // $3: item_id
                 itemQuery.appendInterpolation(bind: Int(item.quantity)) // $4: item_quantity
 
-                // Debugging: Zeige die SQL-Query und die Binds an
-
-                req.logger.debug("Item Insert SQL: \(insertItemSQLBase)")
-                //                req.logger.debug("Executing Item Insert: \(itemQuery.sql) with binds: \(itemQuery.binds)")
-                // 3. Fertige Query an raw().run() übergeben
-                try await sqlDb2.raw(itemQuery).run()
-                req.logger.debug("Inserted item with product ID \(item.id.uuidString) for order \(newOrder.id.uuidString)")
+                try await sqlDb.raw(itemQuery).run()
+                req.logger.debug("Inserted item with product ID \(productId) for order \(urlId)")
             }
-            req.logger.info("Successfully inserted \(newOrder.items.count) items into DB2 for order \(newOrder.id.uuidString).")
+            req.logger.info("Successfully inserted \(newOrder.items.count) items for order \(urlId).")
 
             return .created
 
         } catch {
-            req.logger.error("Generic Error during order processing: \(error)")
-            throw Abort(.internalServerError, reason: "Failed to process order: \(error.localizedDescription)")
+            req.logger.error("Error during order processing: \(error)")
+            // Provide more detail if it's a constraint violation
+            let reason = "Failed to process order: \(error.localizedDescription)"
+            throw Abort(.internalServerError, reason: reason)
         }
     }
 
@@ -113,7 +164,7 @@ public struct OrderController: Sendable {
             throw Abort(.internalServerError)
         }
 
-        let rows = try await db.raw("""
+        var query = SQLQueryString("""
             SELECT
                 json_object(
                     'id', o.id,
@@ -131,9 +182,12 @@ public struct OrderController: Sendable {
                 ) as order_json
             FROM orders o
             LEFT JOIN ordered_items oi ON o.id = oi.order_id
-            WHERE o.id = '\(unsafeRaw: id)'
+            WHERE o.id = $1
             GROUP BY o.id;
-        """).all()
+        """)
+        query.appendInterpolation(bind: id)
+
+        let rows = try await db.raw(query).all()
 
         for row in rows {
             return try row.decode(column: "order_json", as: String.self)
@@ -154,17 +208,20 @@ public struct OrderController: Sendable {
             throw Abort(.internalServerError)
         }
 
-        let rows = try await db.raw("""
+        var query = SQLQueryString("""
             SELECT
                 json_group_array(json(order_json)) AS order_json
             FROM (
                 SELECT
                     order_json
                 FROM ORDER_JSON_VIEW
-                WHERE order_date < CAST('\(unsafeRaw: before)' AS REAL)
+                WHERE order_date < $1
                 LIMIT 20
             );
-        """).all()
+        """)
+        query.appendInterpolation(bind: Double(before) ?? 0.0)
+
+        let rows = try await db.raw(query).all()
 
         for row in rows {
             return try row.decode(column: "order_json", as: String.self)

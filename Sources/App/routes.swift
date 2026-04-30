@@ -12,13 +12,6 @@ private let orderController = OrderController()
 private let authentificationController = AuthentificationController()
 private let realTimeOrderController = RealTimeOrderController()
 
-func configure(_ app: Application) throws {
-    // Verwende SQLite als Datenbank
-    app.databases.use(.sqlite(.memory), as: .sqlite)
-
-    try routes(app)
-}
-
 func routes(_ app: Application) throws {
     let databaseRoute: PathComponent = "test"
     let authMiddleware = AuthenticationMiddleware()

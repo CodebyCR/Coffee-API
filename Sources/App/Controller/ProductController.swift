@@ -49,7 +49,7 @@ public struct ProductController: Sendable {
             throw Abort(.internalServerError)
         }
 
-        let rows = try await db.raw("""
+        var query = SQLQueryString("""
             SELECT
             json_object(
                 'id', prod.id,
@@ -71,8 +71,11 @@ public struct ProductController: Sendable {
             FROM products prod
             JOIN product_categories categorie on prod.category = categorie.id
             LEFT JOIN products_tags_relation ptr ON prod.id = ptr.product_id
-            WHERE prod.id = '\(unsafeRaw: id)';
-        """).all()
+            WHERE prod.id = $1;
+        """)
+        query.appendInterpolation(bind: id)
+
+        let rows = try await db.raw(query).all()
 
         for row in rows {
             return try row.decode(column: "product_json", as: String.self)

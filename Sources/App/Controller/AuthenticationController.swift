@@ -55,7 +55,7 @@ struct AuthentificationController: Sendable {
         }
 
 
-        let userDataDbPath = Environment.get("UserData") ?? "/Users/christoph_rohde/Databases/UserData.sqlite"
+        let userDataDbPath = Environment.get("UserData") ?? "/Volumes/Code/UserData.sqlite"
 
         let query1 = """
             ATTACH DATABASE $1 AS userData;
@@ -69,25 +69,34 @@ struct AuthentificationController: Sendable {
             VALUES ($1, $2, $3, $4, $5);
         """
 
+        let queryLocal = """
+            INSERT INTO users (id, name, email)
+            VALUES ($1, $2, $3);
+        """
+
+        let userId = UUID().uuidString
         var insertQuery = SQLQueryString(query2)
-        insertQuery.appendInterpolation(bind: UUID().uuidString)    // $2 - Unique user ID
-        insertQuery.appendInterpolation(bind: username)             // $3 - Username
-        insertQuery.appendInterpolation(bind: email)                // $4 - Email
-        insertQuery.appendInterpolation(bind: hashedPassword)       // $5 - Hashed Password
-        insertQuery.appendInterpolation(bind: salt)                 // $6 - Salt
+        insertQuery.appendInterpolation(bind: userId)               // $1 - Unique user ID
+        insertQuery.appendInterpolation(bind: username)             // $2 - Username
+        insertQuery.appendInterpolation(bind: email)                // $3 - Email
+        insertQuery.appendInterpolation(bind: hashedPassword)       // $4 - Hashed Password
+        insertQuery.appendInterpolation(bind: salt)                 // $5 - Salt
+
+        var insertLocalQuery = SQLQueryString(queryLocal)
+        insertLocalQuery.appendInterpolation(bind: userId)          // $1
+        insertLocalQuery.appendInterpolation(bind: username)        // $2
+        insertLocalQuery.appendInterpolation(bind: email)           // $3
 
         req.logger.debug("Executing User Insert Query: \(insertQuery)")
         do {
-            print("Step 1")
+            print("Step 1: Attach DB")
             try await db.raw(attachQuery).run()
-            print("Step 2")
+            print("Step 2: Insert into userData.users")
             try await db.raw(insertQuery).run()
+            print("Step 3: Insert into local users")
+            try await db.raw(insertLocalQuery).run()
             req.logger.info("User registration successful for \(username).")
         } catch {
-            //return HTTPResponseStatus.ok
-            
-            
-            // Currently throw an error if the database is already attached.
             req.logger.error("Failed to insert user into database: \(error)")
             throw Abort(.internalServerError, reason: "Database error during registration.")
         }
@@ -134,7 +143,7 @@ struct AuthentificationController: Sendable {
         }
 
         // Attach the user data database
-        let userDataDbPath = Environment.get("UserData") ?? "/Users/christoph_rohde/Databases/UserData.sqlite"
+        let userDataDbPath = Environment.get("UserData") ?? "/Volumes/Code/UserData.sqlite"
 
         let query1 = """
             ATTACH DATABASE $1 AS userData;
@@ -154,6 +163,7 @@ struct AuthentificationController: Sendable {
         let loginQuery = """
             SELECT
                 id,
+                name,
                 password,
                 salt
             FROM userData.users
@@ -178,6 +188,28 @@ struct AuthentificationController: Sendable {
             req.logger.error("User ID is missing in the login row.")
             throw Abort(.internalServerError, reason: "Database error during login.")
         }
+        
+        // Sync user to local CoffeeLover database if missing
+        let checkUserQuery = "SELECT id FROM main.users WHERE id = $1;"
+        var checkUserQueryString = SQLQueryString(checkUserQuery)
+        checkUserQueryString.appendInterpolation(bind: userId)
+        
+        do {
+            let localUsers = try await db.raw(checkUserQueryString).all()
+            if localUsers.isEmpty {
+                req.logger.info("Syncing user \(email) to local main database.")
+                let name = (try? loginRow.decode(column: "name", as: String.self)) ?? "User"
+                let syncQuery = "INSERT INTO main.users (id, name, email) VALUES ($1, $2, $3);"
+                var syncQueryString = SQLQueryString(syncQuery)
+                syncQueryString.appendInterpolation(bind: userId)
+                syncQueryString.appendInterpolation(bind: name)
+                syncQueryString.appendInterpolation(bind: email)
+                try await db.raw(syncQueryString).run()
+                req.logger.info("Successfully synced user \(userId) to main.users")
+            }
+        } catch {
+            req.logger.error("Failed to sync user to local database: \(error)")
+        }
 
         guard let storedPassword = try? loginRow.decode(column: "password", as: String.self) else {
             req.logger.error("Password is missing in the login row.")
@@ -201,6 +233,7 @@ struct AuthentificationController: Sendable {
             throw Abort(.unauthorized, reason: "Invalid email or password.")
         }
 
+        let name = (try? loginRow.decode(column: "name", as: String.self)) ?? "User"
         print("User \(email) logged in successfully with ID: \(userId)")
 
         let accessToken = generateAccessToken()
@@ -229,7 +262,9 @@ struct AuthentificationController: Sendable {
             {
                 "accessToken" : "\(accessToken)",
                 "refreshToken" : "\(refreshToken)",
-                "token" : "\(accessToken)"
+                "token" : "\(accessToken)",
+                "id" : "\(userId)",
+                "name" : "\(name)"
             }
         """
     }
@@ -253,7 +288,7 @@ struct AuthentificationController: Sendable {
         }
         
         // Attach the user data database
-        let userDataDbPath = Environment.get("UserData") ?? "/Users/christoph_rohde/Databases/UserData.sqlite"
+        let userDataDbPath = Environment.get("UserData") ?? "/Volumes/Code/UserData.sqlite"
         let attachQuery = SQLQueryString("ATTACH DATABASE $1 AS userData;")
         var attachQueryWithBind = attachQuery
         attachQueryWithBind.appendInterpolation(bind: userDataDbPath)
